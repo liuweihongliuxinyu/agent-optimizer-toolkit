@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Second Brain OS — 动态流水线系统</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: #0a0a0a;
+    color: #00ff41;
+    font-family: 'JetBrains Mono', 'Courier New', monospace;
+    min-height: 100vh;
+    padding: 20px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
+
+  .terminal {
+    width: 100%;
+    max-width: 1100px;
+    border: 2px solid #00ff41;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 0 40px rgba(0, 255, 65, 0.15), 0 0 80px rgba(0, 255, 65, 0.05);
+  }
+
+  .terminal-header {
+    background: #0d1f0d;
+    padding: 10px 16px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    border-bottom: 1px solid #00ff4133;
+  }
+
+  .terminal-dot {
+    width: 12px; height: 12px;
+    border-radius: 50%;
+    background: #ff5f56;
+  }
+  .terminal-dot:nth-child(2) { background: #ffbd2e; }
+  .terminal-dot:nth-child(3) { background: #27c93f; }
+
+  .terminal-title {
+    margin-left: 12px;
+    color: #00ff4188;
+    font-size: 13px;
+  }
+
+  .terminal-body {
+    padding: 30px 36px;
+  }
+
+  /* ─── 标题 ─── */
+  .system-title {
+    text-align: center;
+    font-size: 18px;
+    font-weight: 700;
+    letter-spacing: 3px;
+    margin-bottom: 6px;
+    text-shadow: 0 0 10px #00ff4188;
+  }
+  .system-subtitle {
+    text-align: center;
+    color: #00ff4188;
+    font-size: 11px;
+    margin-bottom: 36px;
+    letter-spacing: 6px;
+  }
+
+  /* ─── 三环引擎 ─── */
+  .engine-section {
+    margin-bottom: 36px;
+  }
+  .section-label {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    margin-bottom: 18px;
+    padding-left: 4px;
+    border-left: 3px solid #00ff41;
+  }
+
+  .pipeline {
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    gap: 0;
+    flex-wrap: wrap;
+  }
+
+  .ring-box {
+    border: 1.5px solid #00ff41;
+    border-radius: 6px;
+    padding: 20px 24px;
+    width: 280px;
+    position: relative;
+    background: #0d1a0d;
+    transition: all 0.3s;
+  }
+  .ring-box:hover {
+    box-shadow: 0 0 20px rgba(0, 255, 65, 0.2);
+    background: #0f200f;
+  }
+
+  .ring-number {
+    position: absolute;
+    top: -12px;
+    left: 16px;
+    background: #0a0a0a;
+    padding: 2px 12px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    border: 1px solid #00ff41;
+    border-radius: 3px;
+  }
+
+  .ring-title {
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    margin-bottom: 6px;
+  }
+
+  .ring-english {
+    font-size: 9px;
+    color: #00ff4166;
+    margin-bottom: 14px;
+    letter-spacing: 1px;
+  }
+
+  .ring-content {
+    font-size: 11px;
+    line-height: 1.8;
+    color: #00ff41bb;
+  }
+
+  .ring-question {
+    margin-top: 12px;
+    padding: 8px 10px;
+    border-left: 2px solid #00ff4188;
+    font-size: 10px;
+    color: #00ff41;
+    background: #00ff4108;
+    border-radius: 0 4px 4px 0;
+  }
+
+  /* ─── 箭头连接 ─── */
+  .arrow-container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 60px;
+    flex-shrink: 0;
+  }
+  .arrow {
+    color: #00ff41;
+    font-size: 28px;
+    font-weight: 700;
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 0.4; }
+    50% { opacity: 1; }
+  }
+
+  /* ─── 反馈闭环 ─── */
+  .feedback-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    margin-top: 20px;
+    font-size: 10px;
+    color: #00ff4188;
+  }
+  .feedback-arrow {
+    font-size: 16px;
+    color: #00ff4166;
+  }
+  .feedback-label {
+    border: 1px dashed #00ff4133;
+    padding: 4px 12px;
+    border-radius: 12px;
+    font-size: 10px;
+    letter-spacing: 1px;
+  }
+
+  /* ─── PARA 目录 ─── */
+  .para-section {
+    margin-top: 8px;
+  }
+
+  .file-tree {
+    background: #050f05;
+    border: 1px solid #00ff4122;
+    border-radius: 6px;
+    padding: 20px 28px;
+    font-size: 12px;
+    line-height: 2;
+    letter-spacing: 0.5px;
+  }
+
+  .tree-line {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .tree-icon { width: 18px; text-align: center; flex-shrink: 0; }
+  .tree-name { color: #00ff41; }
+  .tree-arrow { color: #00ff4166; font-size: 11px; }
+  .tree-tag {
+    font-size: 9px;
+    padding: 1px 8px;
+    border-radius: 3px;
+    margin-left: 6px;
+    letter-spacing: 1px;
+  }
+  .tag-core { background: #00ff4118; color: #00ff41; border: 1px solid #00ff4155; }
+  .tag-task { background: #ffbd2e18; color: #ffbd2e; border: 1px solid #ffbd2e55; }
+  .tag-duty { background: #5f9eff18; color: #5f9eff; border: 1px solid #5f9eff55; }
+  .tag-ref  { background: #88888818; color: #888; border: 1px solid #88888855; }
+  .tag-archive { background: #66666618; color: #666; border: 1px solid #66666655; }
+  .tag-skill { background: #ff5f5618; color: #ff5f56; border: 1px solid #ff5f5655; }
+
+  /* ─── 底部状态栏 ─── */
+  .status-bar {
+    margin-top: 28px;
+    border-top: 1px solid #00ff4122;
+    padding-top: 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 10px;
+    color: #00ff4166;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .status-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .status-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: #00ff41;
+    animation: blink 2s infinite;
+  }
+  @keyframes blink {
+    0%, 100% { opacity: 0.3; }
+    50% { opacity: 1; }
+  }
+  .status-value { color: #00ff4188; }
+
+  /* ─── 响应式 ─── */
+  @media (max-width: 900px) {
+    .pipeline { flex-direction: column; align-items: center; }
+    .arrow-container { width: 100%; height: 30px; }
+    .arrow { transform: rotate(90deg); }
+    .ring-box { width: 100%; max-width: 360px; }
+  }
+</style>
+</head>
+<body>
+<div class="terminal">
+
+  <!-- 标题栏 -->
+  <div class="terminal-header">
+    <div class="terminal-dot"></div>
+    <div class="terminal-dot"></div>
+    <div class="terminal-dot"></div>
+    <span class="terminal-title">second-brain-os — bash — 80×24</span>
+  </div>
+
+  <div class="terminal-body">
+
+    <!-- 系统标题 -->
+    <div class="system-title">▎ 动态流水线 · 非静态图书馆</div>
+    <div class="system-subtitle">TRIGGER → VERIFY → EVOLVE</div>
+
+    <!-- ═══════════ 三环引擎 ═══════════ -->
+    <div class="engine-section">
+      <div class="section-label">// ENGINE — 三环迭代引擎</div>
+
+      <div class="pipeline">
+
+        <!-- 第一环 -->
+        <div class="ring-box">
+          <div class="ring-number">RING 01</div>
+          <div class="ring-title">入口触发</div>
+          <div class="ring-english">INPUT / TRIGGER</div>
+          <div class="ring-content">
+            · 灵感闪念 💡<br>
+            · RSS 降权输入<br>
+            · Flomo 快速捕获
+          </div>
+          <div class="ring-question">
+            ▸ 这个观点我不认同？<br>
+            ▸ 我以为懂了但讲不清？<br>
+            ▸ 这个现象让我困惑？
+          </div>
+        </div>
+
+        <!-- 箭头 -->
+        <div class="arrow-container">
+          <span class="arrow">▸</span>
+        </div>
+
+        <!-- 第二环 -->
+        <div class="ring-box">
+          <div class="ring-number">RING 02</div>
+          <div class="ring-title">验证加工</div>
+          <div class="ring-english">PROCESS / FILTER</div>
+          <div class="ring-content">
+            · 灵感引擎（7刃切割）<br>
+            · 门禁筛选<br>
+            · 挖矿铸卡（8条规则）
+          </div>
+          <div class="ring-question">
+            ▸ 10秒能说出反例吗？<br>
+            ▸ 能解释两个不相干现象吗？<br>
+            ▸ 最强反方会质疑哪里？<br>
+            ▸ 这次比上次新在哪儿？
+          </div>
+        </div>
+
+        <!-- 箭头 -->
+        <div class="arrow-container">
+          <span class="arrow">▸</span>
+        </div>
+
+        <!-- 第三环 -->
+        <div class="ring-box">
+          <div class="ring-number">RING 03</div>
+          <div class="ring-title">认知演进</div>
+          <div class="ring-english">OUTPUT / EVOLVE</div>
+          <div class="ring-content">
+            · 口播 / 长文 / 短内容<br>
+            · 发布 & 收集反馈<br>
+            · 认知升级后回流迭代
+          </div>
+          <div class="ring-question">
+            ▸ 上篇结论是什么？<br>
+            ▸ 这篇推进了什么？<br>
+            ▸ 有没有值得截图的一句？
+          </div>
+        </div>
+
+      </div>
+
+      <!-- 反馈闭环 -->
+      <div class="feedback-row">
+        <span class="feedback-arrow">↺</span>
+        <span class="feedback-label">反馈闭环：认知升级 → 回流优化 Skills → 重新入盒加工</span>
+        <span class="feedback-arrow">↺</span>
+      </div>
+    </div>
+
+    <!-- ═══════════ PARA 目录 ═══════════ -->
+    <div class="para-section">
+      <div class="section-label">// CONTAINER — PARA 物理存储结构</div>
+
+      <div class="file-tree">
+        <div class="tree-line"><span class="tree-icon">📁</span> <span class="tree-name">my-second-brain/</span></div>
+
+        <div class="tree-line" style="padding-left:18px;">
+          <span class="tree-icon">📁</span> <span class="tree-name">00-灵感库/</span>
+          <span class="tree-tag tag-core">核心战场</span>
+          <span class="tree-arrow">← 入口触发环对接点</span>
+        </div>
+        <div class="tree-line" style="padding-left:36px;">
+          <span class="tree-icon">📄</span> <span class="tree-name">创作流程.md</span>
+        </div>
+
+        <div class="tree-line" style="padding-left:18px;">
+          <span class="tree-icon">📁</span> <span class="tree-name">01-Projects/</span>
+          <span class="tree-tag tag-task">任务态</span>
+          <span class="tree-arrow">← 有 DDL 的具体项目</span>
+        </div>
+
+        <div class="tree-line" style="padding-left:18px;">
+          <span class="tree-icon">📁</span> <span class="tree-name">02-Areas/</span>
+          <span class="tree-tag tag-duty">责任态</span>
+          <span class="tree-arrow">← 长期维护的领域</span>
+        </div>
+        <div class="tree-line" style="padding-left:36px;">
+          <span class="tree-icon">📄</span> <span class="tree-name">知识周转率闭环系统.md</span>
+        </div>
+
+        <div class="tree-line" style="padding-left:18px;">
+          <span class="tree-icon">📁</span> <span class="tree-name">03-Resources/</span>
+          <span class="tree-tag tag-ref">资料库</span>
+          <span class="tree-arrow">← Canvas / 工具集 / 参考</span>
+        </div>
+
+        <div class="tree-line" style="padding-left:18px;">
+          <span class="tree-icon">📁</span> <span class="tree-name">04-Archive/</span>
+          <span class="tree-tag tag-archive">归档区</span>
+          <span class="tree-arrow">← 已完成 / 不再活跃</span>
+        </div>
+
+        <div class="tree-line" style="padding-left:18px;">
+          <span class="tree-icon">📁</span> <span class="tree-name">05-Skills/</span>
+          <span class="tree-tag tag-skill">技能层</span>
+          <span class="tree-arrow">← 验证加工环对接点</span>
+        </div>
+        <div class="tree-line" style="padding-left:36px;">
+          <span class="tree-icon">📄</span> <span class="tree-name">灵感引擎.SKILL.md</span>
+        </div>
+        <div class="tree-line" style="padding-left:36px;">
+          <span class="tree-icon">📄</span> <span class="tree-name">挖矿铸卡.SKILL.md</span>
+        </div>
+        <div class="tree-line" style="padding-left:36px;">
+          <span class="tree-icon">📄</span> <span class="tree-name">口播生成.SKILL.md</span>
+        </div>
+
+        <div class="tree-line" style="padding-left:18px;">
+          <span class="tree-icon">📁</span> <span class="tree-name">Templates/</span>
+          <span class="tree-arrow">← 笔记模板</span>
+        </div>
+        <div class="tree-line" style="padding-left:18px;">
+          <span class="tree-icon">📁</span> <span class="tree-name">vault-scripts/</span>
+          <span class="tree-arrow">← 自动化脚本 (rss_tool.py, search.py)</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════ 状态栏 ═══════════ -->
+    <div class="status-bar">
+      <div class="status-item">
+        <div class="status-dot"></div>
+        <span>ENGINE STATUS:</span>
+        <span class="status-value">RUNNING</span>
+      </div>
+      <div class="status-item">
+        <span>灵感库待处理:</span>
+        <span class="status-value">≤ 10 条</span>
+      </div>
+      <div class="status-item">
+        <span>本周加工完成:</span>
+        <span class="status-value">3 轮</span>
+      </div>
+      <div class="status-item">
+        <span>认知迭代线:</span>
+        <span class="status-value">ACTIVE</span>
+      </div>
+    </div>
+
+  </div>
+</div>
+</body>
+</html>
