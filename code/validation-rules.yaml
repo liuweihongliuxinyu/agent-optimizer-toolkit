@@ -1,0 +1,176 @@
+# Pre-call Validation Rules 校验规则配置
+# 为每个工具定义参数校验规则，调用前自动检查
+# 用法: validator.check("tool_name", params) → {valid: bool, errors: []}
+
+tools:
+  # ──────────────────────────────────────
+  # 示例1：订单查询
+  # ──────────────────────────────────────
+  get_order:
+    description: "查询订单状态和详情"
+    rules:
+      - field: order_id
+        type: string
+        required: true
+        pattern: "^\\d{8}$"
+        pattern_message: "订单号必须为8位数字"
+      - field: user_id
+        type: string
+        required: true
+        check: "authenticated"
+        check_message: "用户必须已登录"
+
+  # ──────────────────────────────────────
+  # 示例2：创建订单
+  # ──────────────────────────────────────
+  create_order:
+    description: "创建新订单"
+    rules:
+      - field: product_id
+        type: string
+        required: true
+      - field: quantity
+        type: integer
+        required: true
+        min: 1
+        max: 999
+        max_message: "单次最多购买999件"
+      - field: amount
+        type: number
+        required: true
+        min: 0.01
+        min_message: "订单金额必须大于0"
+        max: 50000
+        max_message: "单笔订单金额不能超过50000元"
+      - field: coupon_code
+        type: string
+        required: false
+        pattern: "^[A-Z0-9]{6,12}$"
+        pattern_message: "优惠券码格式不正确"
+      - field: coupon_discount
+        type: number
+        required: false
+        min: 0
+        max: 1000
+        max_message: "优惠券面额不能超过1000元"
+        depends_on: coupon_code
+        depends_message: "使用优惠券时必须填写面额"
+
+  # ──────────────────────────────────────
+  # 示例3：预约服务
+  # ──────────────────────────────────────
+  book_appointment:
+    description: "预约服务时间"
+    rules:
+      - field: user_id
+        type: string
+        required: true
+        check: "authenticated"
+      - field: service_type
+        type: string
+        required: true
+        enum: ["consultation", "surgery", "checkup", "followup"]
+        enum_message: "服务类型无效，可选: consultation/surgery/checkup/followup"
+      - field: appointment_time
+        type: string
+        required: true
+        check: "future_datetime"
+        check_message: "预约时间必须是未来时间"
+      - field: doctor_id
+        type: string
+        required: true
+      - field: duration_minutes
+        type: integer
+        required: false
+        min: 15
+        max: 240
+        default: 30
+
+  # ──────────────────────────────────────
+  # 示例4：搜索商品
+  # ──────────────────────────────────────
+  search_products:
+    description: "搜索商品列表"
+    rules:
+      - field: query
+        type: string
+        required: true
+        min_length: 1
+        max_length: 200
+        max_length_message: "搜索词不能超过200个字符"
+        sanitize: true  # 防止注入
+        sanitize_message: "搜索词包含非法字符"
+      - field: category
+        type: string
+        required: false
+      - field: price_min
+        type: number
+        required: false
+        min: 0
+      - field: price_max
+        type: number
+        required: false
+        min: 0
+        cross_validate: "price_max >= price_min if both present"
+        cross_message: "最高价不能低于最低价"
+      - field: page
+        type: integer
+        required: false
+        min: 1
+        default: 1
+      - field: page_size
+        type: integer
+        required: false
+        min: 1
+        max: 50
+        default: 20
+
+  # ──────────────────────────────────────
+  # 示例5：发送消息
+  # ──────────────────────────────────────
+  send_message:
+    description: "向用户发送消息"
+    rules:
+      - field: recipient_id
+        type: string
+        required: true
+      - field: content
+        type: string
+        required: true
+        min_length: 1
+        max_length: 5000
+        max_length_message: "消息内容不能超过5000字"
+        sanitize: true
+      - field: channel
+        type: string
+        required: false
+        enum: ["sms", "email", "push", "in_app"]
+        default: "in_app"
+
+# ──────────────────────────────────────
+# 全局规则（对所有工具生效）
+# ──────────────────────────────────────
+global_rules:
+  - check: "no_sql_injection"
+    message: "参数包含疑似SQL注入特征"
+    severity: "block"  # block=拒绝调用, warn=警告但放行
+
+  - check: "no_xss"
+    message: "参数包含疑似XSS攻击特征"
+    severity: "block"
+
+  - check: "rate_limit"
+    message: "调用频率过高，请稍后再试"
+    severity: "block"
+    config:
+      max_calls_per_minute: 60
+      max_calls_per_hour: 1000
+
+# ──────────────────────────────────────
+# 校验失败处理策略
+# ──────────────────────────────────────
+failure_policy:
+  on_validation_fail: "reject_and_retry"  # 拒绝调用，让Agent重新生成参数
+  max_retries: 3
+  on_max_retries_exceeded: "ask_user"     # 向用户确认参数
+  log_all_failures: true                  # 记录所有校验失败日志
